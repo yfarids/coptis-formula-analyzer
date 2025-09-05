@@ -1,0 +1,407 @@
+@page "/"
+@using CoptisFormulaAnalyzer.Core.Interfaces
+@using CoptisFormulaAnalyzer.Core.DTOs
+@using CoptisFormulaAnalyzer.Application.Services
+@using Microsoft.JSInterop
+@inject IFormulaService FormulaService
+@inject IRawMaterialService RawMaterialService
+@inject FileImportService FileImportService
+@inject IJSRuntime JSRuntime
+
+<h1>Coptis Formula Analyzer</h1>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">Coptis Formula Analyzer</h1>
+        </div>
+    </div>
+
+    <!-- Import Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Import Formula</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="jsonInput" class="form-label">JSON Formula:</label>
+                        <textarea @bind="jsonInput" class="form-control" id="jsonInput" rows="10" 
+                                placeholder='{"name": "Formula Name", "components": [{"name": "Component Name", "weight": 100, "price": 5.0}]}'></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <button class="btn btn-primary" @onclick="ImportFormula" disabled="@isImporting">
+                            @if (isImporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Import Formula
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(importMessage))
+                    {
+                        <div class="alert @(importSuccess ? "alert-success" : "alert-danger")" role="alert">
+                            @importMessage
+                        </div>
+                    }
+                    <small class="text-muted">
+                        Auto-import folder: @FileImportService.GetWatchFolderPath()
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulas Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Formulas (@formulas.Count())</h3>
+                    <button class="btn btn-success" @onclick="RefreshData">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (formulas.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Weight (g)</th>
+                                        <th>Total Cost (EUR)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var formula in formulas)
+                                    {
+                                        <tr class="@(formula.IsPriceUpdated ? "table-warning" : "")">
+                                            <td>@formula.Name</td>
+                                            <td>@formula.TotalWeight.ToString("F2")</td>
+                                            <td>@formula.TotalCost.ToString("F2")</td>
+                                            <td>
+                                                <button class="btn btn-danger btn-sm" @onclick="() => DeleteFormula(formula.Name)">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No formulas available. Import some formulas to get started.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Materials Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Raw Materials</h3>
+                </div>
+                <div class="card-body">
+                    @if (rawMaterials.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Price (EUR/kg)</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var rawMaterial in rawMaterials)
+                                    {
+                                        <tr>
+                                            <td>@rawMaterial.Name</td>
+                                            <td>
+                                                @if (editingRawMaterialId == rawMaterial.Id)
+                                                {
+                                                    <input type="number" step="0.01" @bind="editPrice" class="form-control form-control-sm" style="width: 120px;" />
+                                                }
+                                                else
+                                                {
+                                                    @rawMaterial.PricePerKg.ToString("F2")
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (editingRawMaterialId == rawMaterial.Id)
+                                                {
+                                                    <button class="btn btn-success btn-sm me-2" @onclick="SavePriceUpdate">
+                                                        <i class="bi bi-check"></i> Save
+                                                    </button>
+                                                    <button class="btn btn-secondary btn-sm" @onclick="CancelPriceUpdate">
+                                                        <i class="bi bi-x"></i> Cancel
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-primary btn-sm" @onclick="() => StartPriceEdit(rawMaterial.Id, rawMaterial.PricePerKg)">
+                                                        <i class="bi bi-pencil"></i> Update Price
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No raw materials available.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Substances Analysis Section -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Substances by Total Weight</h3>
+                </div>
+                <div class="card-body">
+                    @if (substancesByWeight.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Total Weight (g)</th>
+                                        <th>Number of Formulas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var substance in substancesByWeight)
+                                    {
+                                        <tr>
+                                            <td>@substance.Name</td>
+                                            <td>@substance.TotalWeight.ToString("F2")</td>
+                                            <td>@substance.NumberOfFormulas</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No substance data available.</p>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Substances by Usage Count</h3>
+                </div>
+                <div class="card-body">
+                    @if (substancesByUsage.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Total Weight (g)</th>
+                                        <th>Number of Formulas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var substance in substancesByUsage)
+                                    {
+                                        <tr>
+                                            <td>@substance.Name</td>
+                                            <td>@substance.TotalWeight.ToString("F2")</td>
+                                            <td>@substance.NumberOfFormulas</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No substance data available.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<FormulaDisplayDto> formulas = new List<FormulaDisplayDto>();
+    private IEnumerable<RawMaterialDisplayDto> rawMaterials = new List<RawMaterialDisplayDto>();
+    private IEnumerable<SubstanceAnalysisDto> substancesByWeight = new List<SubstanceAnalysisDto>();
+    private IEnumerable<SubstanceAnalysisDto> substancesByUsage = new List<SubstanceAnalysisDto>();
+
+    private string jsonInput = string.Empty;
+    private string importMessage = string.Empty;
+    private bool importSuccess = false;
+    private bool isImporting = false;
+
+    private int editingRawMaterialId = 0;
+    private decimal editPrice = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    private async Task RefreshData()
+    {
+        try
+        {
+            var formulasData = await FormulaService.GetAllFormulasAsync();
+            formulas = formulasData.Select(f => new FormulaDisplayDto
+            {
+                Id = f.Name.GetHashCode(), // Simple ID generation
+                Name = f.Name,
+                TotalWeight = f.Weight,
+                TotalCost = CalculateTotalCost(f),
+                IsPriceUpdated = false
+            });
+
+            rawMaterials = await RawMaterialService.GetAllRawMaterialsAsync();
+            substancesByWeight = await FormulaService.GetSubstanceAnalysisByWeightAsync();
+            substancesByUsage = await FormulaService.GetSubstanceAnalysisByUsageAsync();
+        }
+        catch (Exception ex)
+        {
+            importMessage = $"Error loading data: {ex.Message}";
+            importSuccess = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private decimal CalculateTotalCost(FormulaDto formula)
+    {
+        decimal totalCost = 0;
+        for (int i = 0; i < formula.RawMaterials.Count; i++)
+        {
+            var rawMaterial = formula.RawMaterials[i];
+            var percentage = i < formula.RawMaterialPercentages.Count ? formula.RawMaterialPercentages[i] : 0;
+            var weight = (formula.Weight * percentage) / 100;
+            totalCost += (weight / 1000) * rawMaterial.Price.Amount;
+        }
+        return Math.Round(totalCost, 2);
+    }
+
+    private async Task ImportFormula()
+    {
+        if (string.IsNullOrWhiteSpace(jsonInput))
+        {
+            importMessage = "Please enter a JSON formula.";
+            importSuccess = false;
+            return;
+        }
+
+        isImporting = true;
+        importMessage = string.Empty;
+
+        try
+        {
+            var success = await FileImportService.ImportFromJsonAsync(jsonInput);
+            if (success)
+            {
+                importMessage = "Formula imported successfully!";
+                importSuccess = true;
+                jsonInput = string.Empty;
+                await RefreshData();
+            }
+            else
+            {
+                importMessage = "Failed to import formula. Please check the JSON format and ensure the formula doesn't already exist.";
+                importSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            importMessage = $"Error importing formula: {ex.Message}";
+            importSuccess = false;
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+
+    private async Task DeleteFormula(string formulaName)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this formula?");
+        if (confirmed)
+        {
+            var success = await FormulaService.DeleteFormulaByNameAsync(formulaName);
+            if (success)
+            {
+                await RefreshData();
+                importMessage = "Formula deleted successfully!";
+                importSuccess = true;
+            }
+            else
+            {
+                importMessage = "Failed to delete formula.";
+                importSuccess = false;
+            }
+        }
+    }
+
+    private void StartPriceEdit(int rawMaterialId, decimal currentPrice)
+    {
+        editingRawMaterialId = rawMaterialId;
+        editPrice = currentPrice;
+    }
+
+    private async Task SavePriceUpdate()
+    {
+        var success = await RawMaterialService.UpdateRawMaterialPriceAsync(editingRawMaterialId, editPrice);
+        if (success)
+        {
+            await RefreshData();
+            importMessage = "Price updated successfully!";
+            importSuccess = true;
+        }
+        else
+        {
+            importMessage = "Failed to update price.";
+            importSuccess = false;
+        }
+        CancelPriceUpdate();
+    }
+
+    private void CancelPriceUpdate()
+    {
+        editingRawMaterialId = 0;
+        editPrice = 0;
+    }
+
+    public class FormulaDisplayDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public decimal TotalWeight { get; set; }
+        public decimal TotalCost { get; set; }
+        public bool IsPriceUpdated { get; set; }
+    }
+}
