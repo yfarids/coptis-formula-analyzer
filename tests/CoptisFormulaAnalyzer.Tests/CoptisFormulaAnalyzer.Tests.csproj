@@ -24,9 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CoptisFormulaAnalyzer.Core\CoptisFormulaAnalyzer.Core.csproj" />
-    <ProjectReference Include="..\CoptisFormulaAnalyzer.Application\CoptisFormulaAnalyzer.Application.csproj" />
-    <ProjectReference Include="..\CoptisFormulaAnalyzer.Infrastructure\CoptisFormulaAnalyzer.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CoptisFormulaAnalyzer.Core\CoptisFormulaAnalyzer.Core.csproj" />
+    <ProjectReference Include="..\..\src\CoptisFormulaAnalyzer.Application\CoptisFormulaAnalyzer.Application.csproj" />
+    <ProjectReference Include="..\..\src\CoptisFormulaAnalyzer.Infrastructure\CoptisFormulaAnalyzer.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

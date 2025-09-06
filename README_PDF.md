@@ -451,11 +451,6 @@ CoptisFormulaAnalyzer/
 │   │   └── Repositories/              # Accès données
 │   │       ├── FormulaRepository.cs
 │   │       └── RawMaterialRepository.cs
-│   ├── CoptisFormulaAnalyzer.Tests/   # Tests unitaires
-│   │   ├── Services/                  # Tests des services
-│   │   ├── Entities/                  # Tests des entités
-│   │   ├── DTOs/                      # Tests des DTOs
-│   │   └── Repositories/              # Tests d'intégration
 │   └── CoptisFormulaAnalyzer.Web/
 │       ├── Pages/                     # Pages Blazor
 │       │   ├── Index.razor               # Page principale
@@ -472,6 +467,17 @@ CoptisFormulaAnalyzer/
 │       ├── appsettings.Development.json # Configuration développement
 │       ├── appsettings.Preproduction.json # Configuration pré-production
 │       └── appsettings.Production.json  # Configuration production
+├── tests/
+│   └── CoptisFormulaAnalyzer.Tests/   # Tests organisés par type
+│       ├── Unit/                      # Tests unitaires (avec mocks)
+│       │   ├── FileImportServiceTests.cs    # Tests service import
+│       │   ├── FormulaServiceTests.cs       # Tests service formules
+│       │   └── RawMaterialServiceTests.cs   # Tests service matières
+│       ├── Integration/               # Tests d'intégration (DB réelle)
+│       │   └── RepositoryTests.cs           # Tests repositories EF Core
+│       ├── Domain/                    # Tests du domaine
+│       │   ├── EntityTests.cs              # Tests entités métier
+│       │   └── DtoTests.cs                 # Tests DTOs et validation
 ├── README.md                          # Documentation principale
 └── CoptisFormulaAnalyzer.sln         # Solution Visual Studio
 ```
@@ -555,8 +561,12 @@ CoptisFormulaAnalyzer/
 │   ├── CoptisFormulaAnalyzer.Core/          # Domaine et interfaces
 │   ├── CoptisFormulaAnalyzer.Application/   # Services métier
 │   ├── CoptisFormulaAnalyzer.Infrastructure/ # Accès données
-│   ├── CoptisFormulaAnalyzer.Web/          # Interface Blazor + configs
-│   └── CoptisFormulaAnalyzer.Tests/        # Tests unitaires (56 tests)
+│   └── CoptisFormulaAnalyzer.Web/          # Interface Blazor + configs
+├── tests/                        # Tests organisés par type
+│   └── CoptisFormulaAnalyzer.Tests/        # Suite de tests (56 tests)
+│       ├── Unit/                           # Tests unitaires avec mocks
+│       ├── Integration/                    # Tests d'intégration DB
+│       ├── Domain/                         # Tests entités et DTOs
 ├── README.md                    # Documentation complète (ce fichier)
 └── CoptisFormulaAnalyzer.sln   # Solution Visual Studio
 ```
