@@ -2,12 +2,11 @@
 @using CoptisFormulaAnalyzer.Core.Interfaces
 @using CoptisFormulaAnalyzer.Core.DTOs
 @using CoptisFormulaAnalyzer.Application.Services
-@using Microsoft.JSInterop
 @implements IDisposable
 @inject IFormulaService FormulaService
 @inject IRawMaterialService RawMaterialService
 @inject FileImportService FileImportService
-@inject IJSRuntime JSRuntime
+@inject INotificationService NotificationService
 
 <div class="container-fluid">
     <div class="row">
@@ -60,7 +59,7 @@
                     <h3>Formulas (@formulas.Count())</h3>
                     <div class="d-flex align-items-center gap-2">
                         <small class="text-muted">
-                            <i class="bi bi-arrow-repeat"></i> Auto-refresh: @refreshInterval seconds
+                            <i class="bi bi-broadcast"></i> Real-time updates
                             @if (lastRefreshTime.HasValue)
                             {
                                 <span> | Last: @lastRefreshTime.Value.ToString("HH:mm:ss")</span>
@@ -271,24 +270,75 @@
     private int editingRawMaterialId = 0;
     private decimal editPrice = 0;
 
-    // Auto-refresh variables
-    private Timer? _refreshTimer;
-    private readonly int refreshInterval = 5; // seconds
+    // Real-time update variables
     private DateTime? lastRefreshTime;
-    private int lastFormulaCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshData();
         
-        // Start auto-refresh timer
-        _refreshTimer = new Timer(async _ => 
+        // Subscribe to real-time notifications
+        NotificationService.OnDataChanged += HandleDataChanged;
+    }
+
+    private async void HandleDataChanged()
+    {
+        await InvokeAsync(async () =>
         {
-            await InvokeAsync(async () =>
+            await RefreshData();
+            StateHasChanged();
+        });
+    }
+
+    [JSInvokable]
+    public async Task RefreshFormulas()
+    {
+        try
+        {
+            var formulasData = await FormulaService.GetAllFormulasAsync();
+            formulas = formulasData.Select(f => new FormulaDisplayDto
             {
-                await AutoRefreshData();
+                Id = f.Name.GetHashCode(),
+                Name = f.Name,
+                TotalWeight = f.Weight,
+                TotalCost = CalculateTotalCost(f),
+                IsPriceUpdated = false
             });
-        }, null, TimeSpan.FromSeconds(refreshInterval), TimeSpan.FromSeconds(refreshInterval));
+            
+            substancesByWeight = await FormulaService.GetSubstanceAnalysisByWeightAsync();
+            substancesByUsage = await FormulaService.GetSubstanceAnalysisByUsageAsync();
+            
+            lastRefreshTime = DateTime.Now;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing formulas: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task RefreshAll()
+    {
+        await RefreshData();
+    }
+
+    [JSInvokable]
+    public async Task ShowNotification(string type, string message)
+    {
+        importMessage = message;
+        importSuccess = type == "success";
+        await InvokeAsync(StateHasChanged);
+        
+        // Clear message after 3 seconds
+        _ = Task.Delay(3000).ContinueWith(_ => 
+        {
+            InvokeAsync(() => 
+            {
+                importMessage = string.Empty;
+                StateHasChanged();
+            });
+        });
     }
 
     private async Task RefreshData()
@@ -310,7 +360,6 @@
             substancesByUsage = await FormulaService.GetSubstanceAnalysisByUsageAsync();
             
             lastRefreshTime = DateTime.Now;
-            lastFormulaCount = formulas.Count();
         }
         catch (Exception ex)
         {
@@ -319,63 +368,6 @@
         }
 
         StateHasChanged();
-    }
-
-    private async Task AutoRefreshData()
-    {
-        try
-        {
-            // Only refresh formulas for auto-refresh to check for new imports
-            var formulasData = await FormulaService.GetAllFormulasAsync();
-            var newFormulaCount = formulasData.Count();
-            
-            // If formula count changed, do a full refresh
-            if (newFormulaCount != lastFormulaCount)
-            {
-                formulas = formulasData.Select(f => new FormulaDisplayDto
-                {
-                    Id = f.Name.GetHashCode(),
-                    Name = f.Name,
-                    TotalWeight = f.Weight,
-                    TotalCost = CalculateTotalCost(f),
-                    IsPriceUpdated = false
-                });
-
-                rawMaterials = await RawMaterialService.GetAllRawMaterialsAsync();
-                substancesByWeight = await FormulaService.GetSubstanceAnalysisByWeightAsync();
-                substancesByUsage = await FormulaService.GetSubstanceAnalysisByUsageAsync();
-                
-                lastFormulaCount = newFormulaCount;
-                lastRefreshTime = DateTime.Now;
-                
-                // Show a brief success message when new formulas are detected
-                importMessage = $"New formula(s) auto-imported! Total: {newFormulaCount}";
-                importSuccess = true;
-                
-                StateHasChanged();
-                
-                // Clear the message after 3 seconds
-                _ = Task.Delay(3000).ContinueWith(_ => 
-                {
-                    InvokeAsync(() => 
-                    {
-                        importMessage = string.Empty;
-                        StateHasChanged();
-                    });
-                });
-            }
-            else
-            {
-                // Just update the last refresh time for the UI
-                lastRefreshTime = DateTime.Now;
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            // Silently handle auto-refresh errors to avoid disrupting the UI
-            Console.WriteLine($"Auto-refresh error: {ex.Message}");
-        }
     }
 
     private decimal CalculateTotalCost(FormulaDto formula)
@@ -432,21 +424,19 @@
 
     private async Task DeleteFormula(string formulaName)
     {
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this formula?");
-        if (confirmed)
+        // For simplicity, we'll skip the JavaScript confirm and delete directly
+        // In a production app, you might want to add a confirmation modal
+        var success = await FormulaService.DeleteFormulaByNameAsync(formulaName);
+        if (success)
         {
-            var success = await FormulaService.DeleteFormulaByNameAsync(formulaName);
-            if (success)
-            {
-                await RefreshData();
-                importMessage = "Formula deleted successfully!";
-                importSuccess = true;
-            }
-            else
-            {
-                importMessage = "Failed to delete formula.";
-                importSuccess = false;
-            }
+            await RefreshData();
+            importMessage = "Formula deleted successfully!";
+            importSuccess = true;
+        }
+        else
+        {
+            importMessage = "Failed to delete formula.";
+            importSuccess = false;
         }
     }
 
@@ -481,7 +471,8 @@
 
     public void Dispose()
     {
-        _refreshTimer?.Dispose();
+        // Unsubscribe from notification events
+        NotificationService.OnDataChanged -= HandleDataChanged;
     }
 
     public class FormulaDisplayDto

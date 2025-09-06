@@ -7,13 +7,16 @@ public class RawMaterialService : IRawMaterialService
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly ILogger<RawMaterialService> _logger;
+    private readonly INotificationService? _notificationService;
 
     public RawMaterialService(
         IRawMaterialRepository rawMaterialRepository,
-        ILogger<RawMaterialService> logger)
+        ILogger<RawMaterialService> logger,
+        INotificationService? notificationService = null)
     {
         _rawMaterialRepository = rawMaterialRepository;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     public async Task<IEnumerable<RawMaterialDisplayDto>> GetAllRawMaterialsAsync()
@@ -45,6 +48,12 @@ public class RawMaterialService : IRawMaterialService
             
             _logger.LogInformation("Raw material {RawMaterialName} price updated to {NewPrice}", 
                 rawMaterial.Name, newPrice);
+            
+            // Notify clients of price update
+            if (_notificationService != null)
+            {
+                await _notificationService.NotifyPriceUpdatedAsync(rawMaterial.Name, newPrice);
+            }
             
             return true;
         }

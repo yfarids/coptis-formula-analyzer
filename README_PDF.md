@@ -48,7 +48,7 @@ Cette application .NET 8 Blazor Server implémente un système complet d'analyse
 #### 3. **Visualisation des formules**
 - Liste complète avec nom, poids total (g) et coût total (EUR)
 - Mise en évidence des formules avec prix mis à jour
-- Rafraîchissement automatique toutes les 5 secondes
+- Mises à jour en temps réel via notifications événementielles
 - Bouton de rafraîchissement manuel
 
 #### 4. **Suppression de formules**
@@ -78,6 +78,7 @@ Cette application .NET 8 Blazor Server implémente un système complet d'analyse
 - **Bootstrap 5.1** : Design moderne et responsive
 - **Icônes Bootstrap** : Interface intuitive
 - **Messages de feedback** : Succès/erreur en temps réel
+- **Notifications événementielles** : Système simple et efficace
 
 #### Robustesse et fiabilité
 - **Gestion d'erreurs complète** : Try-catch avec logging
@@ -132,6 +133,7 @@ Cette application .NET 8 Blazor Server implémente un système complet d'analyse
 - **FormulaService** : Gestion complète des formules
 - **RawMaterialService** : Gestion des matières premières
 - **FileImportService** : Import JSON et surveillance fichiers
+- **SimpleNotificationService** : Notifications événementielles en temps réel
 
 #### Accès aux données
 - **FormulaRepository** : CRUD formules avec EF Core
@@ -289,6 +291,65 @@ Cost (decimal(18,2))
 - **Intégrité** : Suppression en cascade pour composants
 - **Performance** : Index sur les clés étrangères
 
+## Architecture simplifiée et optimisations
+
+### Approche technique choisie
+Cette application utilise une **architecture simplifiée** particulièrement adaptée à Blazor Server, évitant la complexité inutile tout en maintenant des performances optimales.
+
+#### **Notifications événementielles simples**
+```csharp
+// Service de notification léger et efficace
+public class SimpleNotificationService : INotificationService
+{
+    public event Action? OnDataChanged;
+    
+    public Task NotifyFormulaImportedAsync(string formulaName)
+    {
+        OnDataChanged?.Invoke(); // Notification immédiate via événement C#
+        return Task.CompletedTask;
+    }
+}
+```
+
+#### **Intégration Blazor Server native**
+```csharp
+// Composant Blazor avec abonnement direct aux événements
+protected override async Task OnInitializedAsync()
+{
+    await RefreshData();
+    NotificationService.OnDataChanged += HandleDataChanged; // Abonnement simple
+}
+
+private async void HandleDataChanged()
+{
+    await InvokeAsync(async () => {
+        await RefreshData();
+        StateHasChanged(); // Mise à jour UI automatique
+    });
+}
+```
+
+### Complexité évitée
+- **Pas de JavaScript SignalR client** : Blazor Server utilise déjà SignalR en interne
+- **Pas de hub SignalR personnalisé** : Les événements C# suffisent
+- **Pas d'interop JavaScript** : Communication directe entre services C#
+- **Pas de polling base de données** : Notifications déclenchées uniquement lors de changements réels
+
+### Gain de performance
+| **Avant (Polling)** | **Après (Événements)** | **Amélioration** |
+|:---------------------|:------------------------|:------------------|
+| 720 requêtes DB/heure | 0 requête superflue | **99% réduction** |
+| Polling toutes les 5s | Notifications instantanées | **Temps réel** |
+| Charge CPU constante | Charge CPU à la demande | **Efficacité** |
+| Code JavaScript complexe | Code C# pur | **Maintenabilité** |
+
+### Avantages de cette approche
+1. **Performance optimale** : Pas de requêtes inutiles
+2. **Simplicité** : Code C# uniquement, plus facile à déboguer
+3. **Maintenabilité** : Architecture moins complexe
+4. **Tests** : Services C# purs, facilement testables
+5. **Blazor Server natif** : Utilise les capacités intégrées de la plateforme
+
 ## Configuration technique
 
 ### Configuration multi-environnements
@@ -443,7 +504,8 @@ CoptisFormulaAnalyzer/
 │   │       ├── FormulaService.cs         # Service formules
 │   │       ├── RawMaterialService.cs     # Service matières premières
 │   │       ├── FileImportService.cs      # Service import JSON
-│   │       └── FileWatcherService.cs     # Service surveillance
+│   │       ├── FileWatcherService.cs     # Service surveillance
+│   │       └── SimpleNotificationService.cs  # Service notifications temps réel
 │   ├── CoptisFormulaAnalyzer.Infrastructure/
 │   │   ├── Data/                      # Contexte EF
 │   │   │   └── FormulaAnalyzerContext.cs
@@ -578,7 +640,7 @@ Une fois l'application lancée, l'évaluateur devrait voir :
 - **Liste des formules** avec calculs automatiques des coûts
 - **Gestion des matières premières** avec mise à jour des prix
 - **Analyse des substances** par poids et fréquence d'utilisation
-- **Rafraîchissement automatique** toutes les 5 secondes
+- **Mises à jour en temps réel** via notifications événementielles optimisées
 - **Surveillance de fichiers** pour import automatique
 - **Logs Serilog** structurés dans console et fichiers
 
@@ -603,9 +665,15 @@ En cas de problème lors de l'installation :
 
 ### Interface utilisateur
 - **Blazor Server** : Rendu côté serveur optimisé
-- **SignalR** : Communication temps réel efficace
+- **Notifications événementielles** : Communication temps réel efficace sans polling
 - **Bootstrap** : CSS optimisé et responsive
 - **Composants** : Réutilisation et encapsulation
+
+### Optimisations de performance récentes
+- **99% de réduction de charge DB** : Passage de 720 requêtes/heure (polling 5s) aux notifications événementielles
+- **Architecture simplifiée** : Suppression de la complexité SignalR/JavaScript inutile pour Blazor Server
+- **Performance native** : Utilisation du SignalR intégré de Blazor Server
+- **Maintenabilité** : Code C# pur, plus facile à tester et maintenir
 
 ## Évolutions futures possibles
 

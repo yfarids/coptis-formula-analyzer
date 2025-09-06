@@ -22,9 +22,9 @@ try
     // Replace default logging with Serilog
     builder.Host.UseSerilog();
 
-    // Add services to the container.
-    builder.Services.AddRazorPages();
-    builder.Services.AddServerSideBlazor();
+// Add services to the container.
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
 
 // Add Entity Framework
 builder.Services.AddDbContext<FormulaAnalyzerContext>(options =>
@@ -38,6 +38,9 @@ builder.Services.AddScoped<IRawMaterialRepository, RawMaterialRepository>();
 builder.Services.AddScoped<IFormulaService, FormulaService>();
 builder.Services.AddScoped<IRawMaterialService, RawMaterialService>();
 builder.Services.AddScoped<FileImportService>();
+
+// Add simple notification service (no SignalR needed for Blazor Server)
+builder.Services.AddSingleton<CoptisFormulaAnalyzer.Core.Interfaces.INotificationService, CoptisFormulaAnalyzer.Application.Services.SimpleNotificationService>();
 
 // Add file watcher as hosted service
 builder.Services.AddHostedService<FileWatcherService>();

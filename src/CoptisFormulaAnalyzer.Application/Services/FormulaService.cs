@@ -10,15 +10,18 @@ public class FormulaService : IFormulaService
     private readonly IFormulaRepository _formulaRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly ILogger<FormulaService> _logger;
+    private readonly INotificationService? _notificationService;
 
     public FormulaService(
         IFormulaRepository formulaRepository,
         IRawMaterialRepository rawMaterialRepository,
-        ILogger<FormulaService> logger)
+        ILogger<FormulaService> logger,
+        INotificationService? notificationService = null)
     {
         _formulaRepository = formulaRepository;
         _rawMaterialRepository = rawMaterialRepository;
         _logger = logger;
+        _notificationService = notificationService; // Optional for backward compatibility
     }
 
     public async Task<IEnumerable<FormulaDto>> GetAllFormulasAsync()
@@ -119,6 +122,13 @@ public class FormulaService : IFormulaService
 
             await _formulaRepository.AddAsync(formula);
             _logger.LogInformation("Formula {FormulaName} imported successfully", formulaDto.Name);
+            
+            // Notify clients of the new formula
+            if (_notificationService != null)
+            {
+                await _notificationService.NotifyFormulaImportedAsync(formulaDto.Name);
+            }
+            
             return true;
         }
         catch (Exception ex)
@@ -140,6 +150,7 @@ public class FormulaService : IFormulaService
                 return false;
             }
 
+            var formulaName = formula.Name; // Store name for notification
             // Get the raw material IDs used by this formula
             var rawMaterialIds = formula.Components.Select(c => c.RawMaterialId).ToList();
 
@@ -150,6 +161,13 @@ public class FormulaService : IFormulaService
             await CleanupOrphanedRawMaterialsAsync(rawMaterialIds);
 
             _logger.LogInformation("Formula with ID {FormulaId} deleted successfully", id);
+            
+            // Notify clients of the deletion
+            if (_notificationService != null)
+            {
+                await _notificationService.NotifyFormulaDeletedAsync(formulaName);
+            }
+            
             return true;
         }
         catch (Exception ex)
@@ -217,6 +235,12 @@ public class FormulaService : IFormulaService
                 formula.IsPriceUpdated = true;
                 formula.LastModifiedDate = DateTime.UtcNow;
                 await _formulaRepository.UpdateAsync(formula);
+                
+                // Notify clients that formulas have been updated due to price changes
+                if (_notificationService != null)
+                {
+                    await _notificationService.NotifyPriceUpdatedAsync("Multiple", 0);
+                }
             }
         }
     }
