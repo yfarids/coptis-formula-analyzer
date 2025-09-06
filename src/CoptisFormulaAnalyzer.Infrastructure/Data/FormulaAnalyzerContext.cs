@@ -18,6 +18,15 @@ public class FormulaAnalyzerContext : DbContext
     public DbSet<RawMaterial> RawMaterials { get; set; }
     public DbSet<FormulaComponent> FormulaComponents { get; set; }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            // Design-time connection string
+            optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=CoptisFormulaAnalyzer;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true;Encrypt=false");
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configure Formula entity
