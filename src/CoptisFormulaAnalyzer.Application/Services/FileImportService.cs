@@ -1,5 +1,6 @@
 using CoptisFormulaAnalyzer.Core.DTOs;
 using CoptisFormulaAnalyzer.Core.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -11,17 +12,57 @@ public class FileImportService
     private readonly ILogger<FileImportService> _logger;
     private readonly string _watchFolder;
 
-    public FileImportService(IFormulaService formulaService, ILogger<FileImportService> logger)
+    public FileImportService(IFormulaService formulaService, ILogger<FileImportService> logger, IConfiguration configuration)
     {
         _formulaService = formulaService;
         _logger = logger;
-        _watchFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ImportFolder");
+        _watchFolder = GetConfiguredImportPath(configuration);
         
         // Create the import folder if it doesn't exist
         if (!Directory.Exists(_watchFolder))
         {
             Directory.CreateDirectory(_watchFolder);
         }
+    }
+
+    private static string GetConfiguredImportPath(IConfiguration configuration)
+    {
+        // Try to get from appsettings.json first
+        var configuredPath = configuration["ImportFolder"];
+        
+        if (!string.IsNullOrEmpty(configuredPath))
+        {
+            // Handle special folder placeholders
+            if (configuredPath.Contains("{ProgramData}"))
+            {
+                return configuredPath.Replace("{ProgramData}", 
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
+            }
+            
+            if (configuredPath.Contains("{CommonDocuments}"))
+            {
+                return configuredPath.Replace("{CommonDocuments}", 
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments));
+            }
+            
+            if (configuredPath.Contains("{MyDocuments}"))
+            {
+                return configuredPath.Replace("{MyDocuments}", 
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            }
+            
+            // If it's an absolute path, use it as-is
+            if (Path.IsPathRooted(configuredPath))
+            {
+                return configuredPath;
+            }
+            
+            // If relative path, combine with application base directory
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configuredPath);
+        }
+        
+        // Default fallback to ProgramData
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CoptisFormulas");
     }
 
     public async Task<bool> ImportFromJsonAsync(string jsonContent)
