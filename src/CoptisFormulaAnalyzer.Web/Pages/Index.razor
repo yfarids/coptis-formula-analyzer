@@ -3,6 +3,7 @@
 @using CoptisFormulaAnalyzer.Core.DTOs
 @using CoptisFormulaAnalyzer.Application.Services
 @using Microsoft.JSInterop
+@implements IDisposable
 @inject IFormulaService FormulaService
 @inject IRawMaterialService RawMaterialService
 @inject FileImportService FileImportService
@@ -59,9 +60,18 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3>Formulas (@formulas.Count())</h3>
-                    <button class="btn btn-success" @onclick="RefreshData">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">
+                            <i class="bi bi-arrow-repeat"></i> Auto-refresh: @refreshInterval seconds
+                            @if (lastRefreshTime.HasValue)
+                            {
+                                <span> | Last: @lastRefreshTime.Value.ToString("HH:mm:ss")</span>
+                            }
+                        </small>
+                        <button class="btn btn-success" @onclick="RefreshData">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Now
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if (formulas.Any())
@@ -263,9 +273,24 @@
     private int editingRawMaterialId = 0;
     private decimal editPrice = 0;
 
+    // Auto-refresh variables
+    private Timer? _refreshTimer;
+    private readonly int refreshInterval = 5; // seconds
+    private DateTime? lastRefreshTime;
+    private int lastFormulaCount = 0;
+
     protected override async Task OnInitializedAsync()
     {
         await RefreshData();
+        
+        // Start auto-refresh timer
+        _refreshTimer = new Timer(async _ => 
+        {
+            await InvokeAsync(async () =>
+            {
+                await AutoRefreshData();
+            });
+        }, null, TimeSpan.FromSeconds(refreshInterval), TimeSpan.FromSeconds(refreshInterval));
     }
 
     private async Task RefreshData()
@@ -285,6 +310,9 @@
             rawMaterials = await RawMaterialService.GetAllRawMaterialsAsync();
             substancesByWeight = await FormulaService.GetSubstanceAnalysisByWeightAsync();
             substancesByUsage = await FormulaService.GetSubstanceAnalysisByUsageAsync();
+            
+            lastRefreshTime = DateTime.Now;
+            lastFormulaCount = formulas.Count();
         }
         catch (Exception ex)
         {
@@ -293,6 +321,63 @@
         }
 
         StateHasChanged();
+    }
+
+    private async Task AutoRefreshData()
+    {
+        try
+        {
+            // Only refresh formulas for auto-refresh to check for new imports
+            var formulasData = await FormulaService.GetAllFormulasAsync();
+            var newFormulaCount = formulasData.Count();
+            
+            // If formula count changed, do a full refresh
+            if (newFormulaCount != lastFormulaCount)
+            {
+                formulas = formulasData.Select(f => new FormulaDisplayDto
+                {
+                    Id = f.Name.GetHashCode(),
+                    Name = f.Name,
+                    TotalWeight = f.Weight,
+                    TotalCost = CalculateTotalCost(f),
+                    IsPriceUpdated = false
+                });
+
+                rawMaterials = await RawMaterialService.GetAllRawMaterialsAsync();
+                substancesByWeight = await FormulaService.GetSubstanceAnalysisByWeightAsync();
+                substancesByUsage = await FormulaService.GetSubstanceAnalysisByUsageAsync();
+                
+                lastFormulaCount = newFormulaCount;
+                lastRefreshTime = DateTime.Now;
+                
+                // Show a brief success message when new formulas are detected
+                importMessage = $"New formula(s) auto-imported! Total: {newFormulaCount}";
+                importSuccess = true;
+                
+                StateHasChanged();
+                
+                // Clear the message after 3 seconds
+                _ = Task.Delay(3000).ContinueWith(_ => 
+                {
+                    InvokeAsync(() => 
+                    {
+                        importMessage = string.Empty;
+                        StateHasChanged();
+                    });
+                });
+            }
+            else
+            {
+                // Just update the last refresh time for the UI
+                lastRefreshTime = DateTime.Now;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Silently handle auto-refresh errors to avoid disrupting the UI
+            Console.WriteLine($"Auto-refresh error: {ex.Message}");
+        }
     }
 
     private decimal CalculateTotalCost(FormulaDto formula)
@@ -394,6 +479,11 @@
     {
         editingRawMaterialId = 0;
         editPrice = 0;
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
     }
 
     public class FormulaDisplayDto
