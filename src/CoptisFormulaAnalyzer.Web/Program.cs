@@ -3,12 +3,28 @@ using CoptisFormulaAnalyzer.Application.Services;
 using CoptisFormulaAnalyzer.Infrastructure.Data;
 using CoptisFormulaAnalyzer.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+// Configure Serilog early in the pipeline
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json")
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", true)
+        .Build())
+    .CreateLogger();
 
-// Add services to the container.
-builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+try
+{
+    Log.Information("Starting CoptisFormulaAnalyzer Web Application");
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Replace default logging with Serilog
+    builder.Host.UseSerilog();
+
+    // Add services to the container.
+    builder.Services.AddRazorPages();
+    builder.Services.AddServerSideBlazor();
 
 // Add Entity Framework
 builder.Services.AddDbContext<FormulaAnalyzerContext>(options =>
@@ -26,14 +42,17 @@ builder.Services.AddScoped<FileImportService>();
 // Add file watcher as hosted service
 builder.Services.AddHostedService<FileWatcherService>();
 
-var app = builder.Build();
+    var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-}
+    // Add Serilog request logging
+    app.UseSerilogRequestLogging();
+
+    // Configure the HTTP request pipeline.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Error");
+        app.UseHsts();
+    }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -49,11 +68,20 @@ app.MapFallbackToPage("/_Host");
 // var fileImportService = app.Services.GetRequiredService<FileImportService>();
 // fileImportService.StartFileWatcher();
 
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<FormulaAnalyzerContext>();
-    context.Database.EnsureCreated();
-}
+    // Ensure database is created
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<FormulaAnalyzerContext>();
+        context.Database.EnsureCreated();
+    }
 
-app.Run();
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
