@@ -21,7 +21,7 @@ dotnet run
 # 4. Ouvrir https://localhost:5001 dans le navigateur
 ```
 
-**Temps total d'installation :** ~5-10 minutes | **Test avec données d'exemple incluses**
+**Temps total d'installation :** ~5-10 minutes | **Logging Serilog intégré**
 
 ---
 
@@ -82,7 +82,8 @@ Cette application .NET 8 Blazor Server implémente un système complet d'analyse
 #### Robustesse et fiabilité
 - ✅ **Gestion d'erreurs complète** : Try-catch avec logging
 - ✅ **Validation des données** : JSON schema validation
-- ✅ **Logging structuré** : Microsoft.Extensions.Logging
+- ✅ **Logging structuré Serilog** : Console et fichiers avec rotation
+- ✅ **Configuration multi-environnements** : Dev/PreProd/Production
 - ✅ **Concurrence** : Gestion des accès simultanés
 - ✅ **Tests unitaires** : 56 tests couvrant services, entités et DTOs
 
@@ -177,9 +178,10 @@ dotnet run
 - 🌐 **HTTPS** : https://localhost:5001
 - 🌐 **HTTP** : http://localhost:5000
 
-#### Étape 4 : Test avec données d'exemple
-1. **Import web** : Copier le contenu de `sample-formulas\CitralSoap.json` dans l'interface
-2. **Import automatique** : Copier des fichiers JSON dans le dossier de surveillance (affiché dans l'UI)
+#### Étape 4 : Test avec données personnalisées
+1. **Import web** : Créer un fichier JSON de formule et le coller dans l'interface
+2. **Import automatique** : Déposer des fichiers JSON dans le dossier de surveillance (affiché dans l'UI)
+3. **Logs** : Observer les opérations dans les fichiers de logs générés automatiquement
 
 ### 🔧 Configuration alternative de base de données
 
@@ -194,36 +196,59 @@ Si vous n'utilisez pas LocalDB, modifier `src\CoptisFormulaAnalyzer.Web\appsetti
 
 ## 📊 Test de l'application
 
-### Données d'exemple fournies
-Le dossier `sample-formulas` contient :
-- **CitralSoap.json** : Savon au citral (3 matières premières)
-- **GeraniolSoap.json** : Savon au géraniol
-- **1_CitralSoap.json** : Variante du savon citral
+### Création de données de test
+
+Créez des fichiers JSON de formules dans le format suivant :
+
+**Exemple : CitralSoap.json**
+```json
+{
+  "name": "CitralSoap",
+  "substances": [
+    {
+      "name": "CitralEssence",
+      "pricePerKg": 100.0,
+      "weightInGrams": 15.0
+    },
+    {
+      "name": "Water",
+      "pricePerKg": 1.0,
+      "weightInGrams": 500.0
+    },
+    {
+      "name": "NaturalGlycerin",
+      "pricePerKg": 3.0,
+      "weightInGrams": 80.0
+    }
+  ]
+}
+```
 
 ### Scénarios de test
 
 #### Import via interface web
-1. Copier le contenu de `sample-formulas/CitralSoap.json`
-2. Coller dans la zone de texte
+1. Créer un fichier JSON avec le format ci-dessus
+2. Copier le contenu dans la zone de texte de l'interface
 3. Cliquer "Import Formula"
 4. Vérifier l'affichage dans la liste des formules
 
 #### Import automatique
 1. Noter le chemin du dossier de surveillance (affiché dans l'UI)
-2. Copier les fichiers JSON dans ce dossier
-3. Observer le traitement automatique
+2. Copier des fichiers JSON dans ce dossier
+3. Observer le traitement automatique dans les logs
 4. Vérifier le déplacement vers Processed/Errors
 
 #### Gestion des prix
 1. Aller dans la section "Raw Materials"
 2. Cliquer "Update Price" sur une matière première
 3. Modifier le prix et sauvegarder
-4. Observer la mise à jour des coûts de formules
+4. Observer la mise à jour des coûts de formules dans les logs
 
-### Résultats attendus
-- **Formules** : CitralSoap (≈3.40 EUR), GeraniolSoap (≈2.50 EUR)
-- **Matières premières** : CitralEsence (100 EUR/kg), Water (1 EUR/kg), NaturalGlycerin (3 EUR/kg)
-- **Analyse substances** : Classement par poids et fréquence
+### Logs et monitoring
+- **Console** : Logs en temps réel visibles pendant l'exécution
+- **Fichiers** : Logs persistants dans le dossier `logs/`
+- **Environnements** : Logs séparés par environnement (dev/, preprod/, prod/)
+- **Rotation** : Nouveaux fichiers quotidiens avec rétention automatique
 
 ## 💾 Schéma de base de données
 
@@ -266,26 +291,136 @@ Cost (decimal(18,2))
 
 ## 🔧 Configuration technique
 
-### Chaîne de connexion (appsettings.json)
+### Configuration multi-environnements
+
+L'application utilise des fichiers de configuration séparés pour chaque environnement :
+
+#### **appsettings.json** (Base/Default)
 ```json
 {
   "ConnectionStrings": {
     "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=CoptisFormulaAnalyzer;Trusted_Connection=true;MultipleActiveResultSets=true"
   },
-  "ImportFolder": "./ImportFolder",
-  "Logging": {
-    "LogLevel": {
+  "ImportFolder": "C:\\CoptisFormulas",
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+    "MinimumLevel": {
       "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+        }
+      },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/coptis-formula-analyzer-.txt",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 30,
+          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+        }
+      }
+    ]
   }
 }
 ```
 
+#### **appsettings.Development.json**
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=CoptisFormulaAnalyzer_Dev;Trusted_Connection=true"
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Debug",
+      "Override": {
+        "Microsoft.EntityFrameworkCore.Database.Command": "Information"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/dev/coptis-formula-analyzer-dev-.txt",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 7
+        }
+      }
+    ]
+  }
+}
+```
+
+#### **appsettings.Preproduction.json**
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=CoptisFormulaAnalyzer_PreProd;Trusted_Connection=true"
+  },
+  "ImportFolder": "C:\\CoptisFormulas\\PreProd",
+  "Serilog": {
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/preprod/coptis-formula-analyzer-preprod-.txt",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 30
+        }
+      }
+    ]
+  }
+}
+```
+
+#### **appsettings.Production.json**
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=YOUR_PROD_SERVER;Database=CoptisFormulaAnalyzer_Prod;Trusted_Connection=true"
+  },
+  "ImportFolder": "C:\\CoptisFormulas\\Production",
+  "Serilog": {
+    "MinimumLevel": {
+      "Override": {
+        "Microsoft.EntityFrameworkCore": "Error"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/prod/coptis-formula-analyzer-.txt",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 90,
+          "buffered": true
+        }
+      }
+    ]
+  }
+}
+```
+
+### Logging Serilog
+- **Console** : Logs temps réel pendant le développement
+- **Fichiers rotatifs** : Un fichier par jour avec rétention configurable
+- **Environnements séparés** : Logs organisés par environnement (dev/, preprod/, prod/)
+- **Niveaux configurables** : Debug en développement, Information en production
+- **Formatage structuré** : Timestamps, niveaux et contexte détaillés
+
 ### Dossier de surveillance
-- **Par défaut** : `[Répertoire application]/ImportFolder/`
-- **Configurable** : Via appsettings.json
-- **Création automatique** : Si n'existe pas
+- **Configurable** : Via ImportFolder dans appsettings
+- **Par environnement** : Dossiers séparés pour éviter les conflits
+- **Création automatique** : Si n'existe pas au démarrage
 
 ## 📁 Structure détaillée du projet
 
@@ -328,12 +463,15 @@ CoptisFormulaAnalyzer/
 │       ├── 📁 Shared/                    # Composants partagés
 │       │   └── MainLayout.razor
 │       ├── 📁 wwwroot/css/              # Styles CSS
-│       ├── Program.cs                    # Configuration DI
-│       └── appsettings.json             # Configuration
-├── 📁 sample-formulas/                   # Données de test
-│   ├── CitralSoap.json
-│   ├── GeraniolSoap.json
-│   └── 1_CitralSoap.json
+│       ├── 📁 logs/                      # Logs Serilog
+│       │   ├── 📁 dev/                  # Logs développement
+│       │   ├── 📁 preprod/              # Logs pré-production
+│       │   └── 📁 prod/                 # Logs production
+│       ├── Program.cs                    # Configuration DI + Serilog
+│       ├── appsettings.json             # Configuration base
+│       ├── appsettings.Development.json # Configuration développement
+│       ├── appsettings.Preproduction.json # Configuration pré-production
+│       └── appsettings.Production.json  # Configuration production
 ├── 📄 README.md                          # Documentation principale
 └── 📄 CoptisFormulaAnalyzer.sln         # Solution Visual Studio
 ```
@@ -401,8 +539,11 @@ dotnet run --urls "https://localhost:7001;http://localhost:7000"
 - Exécuter en tant qu'administrateur si nécessaire
 
 ### Logs et diagnostic
+- **Serilog** : Logs structurés avec timestamps précis
 - **Console** : Logs temps réel pendant exécution
+- **Fichiers** : Logs persistants organisés par environnement
 - **Debug** : Messages détaillés en mode développement
+- **Rotation** : Fichiers quotidiens avec rétention automatique
 - **Erreurs** : Stack traces complètes pour diagnostic
 
 ## 📦 Contenu de la livraison
@@ -414,10 +555,9 @@ CoptisFormulaAnalyzer/
 │   ├── 📁 CoptisFormulaAnalyzer.Core/          # Domaine et interfaces
 │   ├── 📁 CoptisFormulaAnalyzer.Application/   # Services métier
 │   ├── 📁 CoptisFormulaAnalyzer.Infrastructure/ # Accès données
-│   ├── 📁 CoptisFormulaAnalyzer.Web/          # Interface Blazor
+│   ├── 📁 CoptisFormulaAnalyzer.Web/          # Interface Blazor + configs
 │   └── 📁 CoptisFormulaAnalyzer.Tests/        # Tests unitaires (56 tests)
-├── 📁 sample-formulas/             # Données de test (3 fichiers JSON)
-├── 📄 README.md                    # Documentation complète (ce fichier)
+├──  README.md                    # Documentation complète (ce fichier)
 └── 📄 CoptisFormulaAnalyzer.sln   # Solution Visual Studio
 ```
 
@@ -430,6 +570,7 @@ Une fois l'application lancée, l'évaluateur devrait voir :
 - ✅ **Analyse des substances** par poids et fréquence d'utilisation
 - ✅ **Rafraîchissement automatique** toutes les 5 secondes
 - ✅ **Surveillance de fichiers** pour import automatique
+- ✅ **Logs Serilog** structurés dans console et fichiers
 
 ### Temps d'installation estimé
 - **Installation manuelle** : ~5-10 minutes
@@ -475,10 +616,12 @@ En cas de problème lors de l'installation :
 ## 📞 Support technique
 
 Cette application a été développée comme test technique démontrant :
-- ✅ **Maîtrise .NET moderne** : .NET 8, EF Core, Blazor
+- ✅ **Maîtrise .NET moderne** : .NET 8, EF Core, Blazor Server
 - ✅ **Architecture clean** : SOLID, DI, séparation responsabilités
 - ✅ **Développement full-stack** : Backend + Frontend intégré
-- ✅ **Base de données** : Conception, migrations, requêtes
+- ✅ **Base de données** : Conception, migrations, requêtes optimisées
+- ✅ **Logging professionnel** : Serilog avec configurations multi-environnements
+- ✅ **Configuration avancée** : Gestion des environnements Dev/PreProd/Prod
 - ✅ **UX/UI** : Interface moderne et intuitive
 
 
