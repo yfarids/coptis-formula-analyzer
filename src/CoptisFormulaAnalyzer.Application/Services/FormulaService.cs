@@ -100,17 +100,7 @@ public class FormulaService : IFormulaService
                 var actualWeight = (formulaDto.Weight * percentage) / 100;
 
                 // Get or create raw material
-                var rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
-                if (rawMaterial == null)
-                {
-                    rawMaterial = new RawMaterial
-                    {
-                        Name = rawMaterialDto.Name,
-                        PricePerKg = rawMaterialDto.Price.Amount,
-                        CreatedDate = DateTime.UtcNow
-                    };
-                    rawMaterial = await _rawMaterialRepository.AddAsync(rawMaterial);
-                }
+                var rawMaterial = await GetOrCreateRawMaterialAsync(rawMaterialDto);
 
                 var component = new FormulaComponent
                 {
@@ -142,7 +132,23 @@ public class FormulaService : IFormulaService
     {
         try
         {
+            // Get the formula first to identify its raw materials
+            var formula = await _formulaRepository.GetByIdAsync(id);
+            if (formula == null)
+            {
+                _logger.LogWarning("Formula with ID {FormulaId} not found for deletion", id);
+                return false;
+            }
+
+            // Get the raw material IDs used by this formula
+            var rawMaterialIds = formula.Components.Select(c => c.RawMaterialId).ToList();
+
+            // Delete the formula (this will cascade delete the components)
             await _formulaRepository.DeleteAsync(id);
+            
+            // Clean up orphaned raw materials
+            await CleanupOrphanedRawMaterialsAsync(rawMaterialIds);
+
             _logger.LogInformation("Formula with ID {FormulaId} deleted successfully", id);
             return true;
         }
@@ -166,7 +172,15 @@ public class FormulaService : IFormulaService
                 return false;
             }
 
+            // Get the raw material IDs used by this formula
+            var rawMaterialIds = formula.Components.Select(c => c.RawMaterialId).ToList();
+
+            // Delete the formula
             await _formulaRepository.DeleteAsync(formula.Id);
+            
+            // Clean up orphaned raw materials
+            await CleanupOrphanedRawMaterialsAsync(rawMaterialIds);
+
             _logger.LogInformation("Formula {FormulaName} deleted successfully", name);
             return true;
         }
@@ -244,5 +258,74 @@ public class FormulaService : IFormulaService
             .ToList();
 
         return substances;
+    }
+
+    private async Task CleanupOrphanedRawMaterialsAsync(IEnumerable<int> potentialOrphanIds)
+    {
+        try
+        {
+            // Get all formulas to check which raw materials are still in use
+            var allFormulas = await _formulaRepository.GetAllAsync();
+            var usedRawMaterialIds = allFormulas
+                .SelectMany(f => f.Components)
+                .Select(c => c.RawMaterialId)
+                .Distinct()
+                .ToHashSet();
+
+            // Find orphaned raw materials from the potential orphans
+            var orphanedIds = potentialOrphanIds.Where(id => !usedRawMaterialIds.Contains(id)).ToList();
+
+            // Delete orphaned raw materials
+            foreach (var orphanId in orphanedIds)
+            {
+                await _rawMaterialRepository.DeleteAsync(orphanId);
+                _logger.LogInformation("Deleted orphaned raw material with ID {RawMaterialId}", orphanId);
+            }
+
+            if (orphanedIds.Any())
+            {
+                _logger.LogInformation("Cleaned up {Count} orphaned raw materials", orphanedIds.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cleaning up orphaned raw materials");
+        }
+    }
+
+    private async Task<RawMaterial> GetOrCreateRawMaterialAsync(RawMaterialDto rawMaterialDto)
+    {
+        // First attempt to get existing raw material
+        var rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
+        if (rawMaterial != null)
+        {
+            return rawMaterial;
+        }
+
+        // Try to create new raw material
+        try
+        {
+            rawMaterial = new RawMaterial
+            {
+                Name = rawMaterialDto.Name,
+                PricePerKg = rawMaterialDto.Price.Amount,
+                CreatedDate = DateTime.UtcNow
+            };
+            return await _rawMaterialRepository.AddAsync(rawMaterial);
+        }
+        catch (Exception ex) when (ex.Message.Contains("duplicate key") || ex.Message.Contains("IX_RawMaterials_Name"))
+        {
+            // Another thread/process created this raw material, fetch the existing one
+            _logger.LogInformation("Raw material {RawMaterialName} was created by another process, fetching existing one", rawMaterialDto.Name);
+            
+            rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
+            if (rawMaterial == null)
+            {
+                _logger.LogError("Failed to retrieve raw material {RawMaterialName} after duplicate key error", rawMaterialDto.Name);
+                throw new InvalidOperationException($"Could not create or retrieve raw material: {rawMaterialDto.Name}");
+            }
+            
+            return rawMaterial;
+        }
     }
 }
