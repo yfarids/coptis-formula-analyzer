@@ -1,6 +1,6 @@
-# Analyseur de Formules Coptis
+# Coptis Formula Project
 
-Un outil d'analyse de formules cosmétiques complet développé avec .NET 8.0 et Blazor Server. Cette application offre des capacités avancées pour l'importation, l'analyse et la gestion des formulations cosmétiques avec des calculs de coûts en temps réel et une analyse des substances.
+Un outil d'analyse de composition cosmétique complet développé avec .NET 8 et Blazor Server. Cette application offre des capacités avancées pour l'importation, l'analyse et la gestion des formulations cosmétiques avec des calculs de coûts en temps réel et une analyse des substances.
 
 ## Fonctionnalités Principales
 
@@ -30,34 +30,34 @@ L'application suit les principes de l'**Architecture Propre** (Clean Architectur
 
 ```
 ┌─────────────────────────────────────────┐
-│            Couche Présentation         │
-│    - Pages et Composants Blazor Server │
-│    - Intégration SignalR Temps Réel    │
-│    - Interface et Interactions Utilis. │
+│            Couche Présentation          │
+│    - Pages et Composants Blazor Server  │
+│    - Intégration SignalR Temps Réel     │
+│    - Interface et Interactions Utilis.  │
 └─────────────────────────────────────────┘
             ↓ Injection de Dépendances
 ┌─────────────────────────────────────────┐
 │           Couche Application            │
-│    - Logique Métier et Services        │
-│    - Import et Traitement de Fichiers  │
-│    - Calculs de Coûts des Formules     │
-│    - Surveillance de Fichiers en Arr.  │
+│    - Logique Métier et Services         │
+│    - Import et Traitement de Fichiers   │
+│    - Calculs de Coûts des Formules      │
+│    - Surveillance de Fichiers en Arr.   │
 └─────────────────────────────────────────┘
             ↓ Implémentation d'Interfaces
 ┌─────────────────────────────────────────┐
 │          Couche Infrastructure          │
-│    - Entity Framework Core             │
-│    - Base de Données SQL Server        │
-│    - Pattern Repository                │
-│    - Persistance des Données           │
+│    - Entity Framework Core              │
+│    - Base de Données SQL Server         │
+│    - Pattern Repository                 │
+│    - Persistance des Données            │
 └─────────────────────────────────────────┘
             ↓ Abstractions du Domaine
 ┌─────────────────────────────────────────┐
 │             Couche Domaine              │
-│    - Entités du Domaine                │
-│    - DTOs Métier                       │
-│    - Contrats d'Interfaces             │
-│    - Règles du Domaine                 │
+│    - Entités du Domaine                 │
+│    - DTOs Métier                        │
+│    - Contrats d'Interfaces              │
+│    - Règles du Domaine                  │
 └─────────────────────────────────────────┘
 ```
 
