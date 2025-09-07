@@ -272,10 +272,6 @@
 
     // Real-time update variables
     private DateTime? lastRefreshTime;
-    
-    // Prevent concurrent refresh operations
-    private bool isRefreshing = false;
-    private readonly SemaphoreSlim refreshSemaphore = new SemaphoreSlim(1, 1);
 
     protected override async Task OnInitializedAsync()
     {
@@ -287,8 +283,8 @@
 
     private async void HandleDataChanged()
     {
-        // Skip if already refreshing or importing
-        if (isRefreshing || isImporting)
+        // Only refresh for automatic imports (file watcher), skip if manual import is in progress
+        if (isImporting)
             return;
             
         await InvokeAsync(async () =>
@@ -351,15 +347,8 @@
 
     private async Task RefreshData()
     {
-        // Prevent concurrent refresh operations
-        if (!await refreshSemaphore.WaitAsync(100)) // Wait max 100ms
-        {
-            return; // Another refresh is already in progress, skip this one
-        }
-        
         try
         {
-            isRefreshing = true;
             var formulasData = await FormulaService.GetAllFormulasAsync();
             formulas = formulasData.Select(f => new FormulaDisplayDto
             {
@@ -380,11 +369,6 @@
         {
             importMessage = $"Error loading data: {ex.Message}";
             importSuccess = false;
-        }
-        finally
-        {
-            isRefreshing = false;
-            refreshSemaphore.Release();
         }
 
         StateHasChanged();
@@ -417,15 +401,15 @@
 
         try
         {
-            var success = await FileImportService.ImportFromJsonAsync(jsonInput);
+            // Manual import - don't send notifications since we'll refresh manually
+            var success = await FileImportService.ImportFromJsonAsync(jsonInput, sendNotification: false);
             if (success)
             {
                 importMessage = "Formula imported successfully!";
                 importSuccess = true;
                 jsonInput = string.Empty;
                 
-                // RefreshData will be called automatically by the notification system
-                // But we can also call it here safely due to our semaphore protection
+                // Manual refresh - no automatic notification needed
                 await RefreshData();
             }
             else
@@ -496,9 +480,6 @@
     {
         // Unsubscribe from notification events
         NotificationService.OnDataChanged -= HandleDataChanged;
-        
-        // Dispose semaphore
-        refreshSemaphore?.Dispose();
     }
 
     public class FormulaDisplayDto

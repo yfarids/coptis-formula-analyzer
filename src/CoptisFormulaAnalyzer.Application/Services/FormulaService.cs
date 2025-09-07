@@ -76,6 +76,11 @@ public class FormulaService : IFormulaService
 
     public async Task<bool> ImportFormulaAsync(FormulaDto formulaDto)
     {
+        return await ImportFormulaAsync(formulaDto, sendNotification: true);
+    }
+
+    public async Task<bool> ImportFormulaAsync(FormulaDto formulaDto, bool sendNotification)
+    {
         try
         {
             // Check if formula already exists
@@ -123,8 +128,8 @@ public class FormulaService : IFormulaService
             await _formulaRepository.AddAsync(formula);
             _logger.LogInformation("Formula {FormulaName} imported successfully", formulaDto.Name);
             
-            // Notify clients of the new formula
-            if (_notificationService != null)
+            // Notify clients of the new formula (only if requested)
+            if (sendNotification && _notificationService != null)
             {
                 await _notificationService.NotifyFormulaImportedAsync(formulaDto.Name);
             }

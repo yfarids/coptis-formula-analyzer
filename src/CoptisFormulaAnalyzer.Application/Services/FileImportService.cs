@@ -67,6 +67,11 @@ public class FileImportService
 
     public async Task<bool> ImportFromJsonAsync(string jsonContent)
     {
+        return await ImportFromJsonAsync(jsonContent, sendNotification: true);
+    }
+
+    public async Task<bool> ImportFromJsonAsync(string jsonContent, bool sendNotification)
+    {
         try
         {
             var options = new JsonSerializerOptions
@@ -81,7 +86,7 @@ public class FileImportService
                 return false;
             }
 
-            return await _formulaService.ImportFormulaAsync(formulaDto);
+            return await _formulaService.ImportFormulaAsync(formulaDto, sendNotification);
         }
         catch (JsonException ex)
         {

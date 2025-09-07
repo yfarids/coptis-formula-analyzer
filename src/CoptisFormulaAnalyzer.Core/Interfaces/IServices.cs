@@ -7,6 +7,7 @@ public interface IFormulaService
     Task<IEnumerable<FormulaDto>> GetAllFormulasAsync();
     Task<FormulaDto?> GetFormulaByIdAsync(int id);
     Task<bool> ImportFormulaAsync(FormulaDto formulaDto);
+    Task<bool> ImportFormulaAsync(FormulaDto formulaDto, bool sendNotification);
     Task<bool> DeleteFormulaAsync(int id);
     Task<bool> DeleteFormulaByNameAsync(string name);
     Task RecalculateFormulaCostsAsync();
