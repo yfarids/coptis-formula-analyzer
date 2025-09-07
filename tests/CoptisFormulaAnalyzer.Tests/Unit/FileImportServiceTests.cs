@@ -55,7 +55,7 @@ public class FileImportServiceTests
             ""RawMaterialPercentages"": [100]
         }";
 
-        _mockFormulaService.Setup(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>()))
+        _mockFormulaService.Setup(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>(), It.IsAny<bool>()))
                           .ReturnsAsync(true);
 
         // Act
@@ -63,7 +63,7 @@ public class FileImportServiceTests
 
         // Assert
         Assert.True(result);
-        _mockFormulaService.Verify(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>()), Times.Once);
+        _mockFormulaService.Verify(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>(), It.IsAny<bool>()), Times.Once);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class FileImportServiceTests
             ""RawMaterialPercentages"": []
         }";
 
-        _mockFormulaService.Setup(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>()))
+        _mockFormulaService.Setup(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>(), It.IsAny<bool>()))
                           .ReturnsAsync(false);
 
         // Act
@@ -118,7 +118,7 @@ public class FileImportServiceTests
 
         // Assert
         Assert.False(result);
-        _mockFormulaService.Verify(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>()), Times.Once);
+        _mockFormulaService.Verify(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>(), It.IsAny<bool>()), Times.Once);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class FileImportServiceTests
         // Arrange
         if (expectedResult)
         {
-            _mockFormulaService.Setup(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>()))
+            _mockFormulaService.Setup(x => x.ImportFormulaAsync(It.IsAny<Core.DTOs.FormulaDto>(), It.IsAny<bool>()))
                               .ReturnsAsync(true);
         }
 
