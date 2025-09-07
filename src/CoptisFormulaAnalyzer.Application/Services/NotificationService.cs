@@ -1,8 +1,6 @@
-using CoptisFormulaAnalyzer.Core.Interfaces;
-
 namespace CoptisFormulaAnalyzer.Application.Services
 {
-    public class SimpleNotificationService : INotificationService
+    public class NotificationService : INotificationService
     {
         public event Action? OnDataChanged;
 

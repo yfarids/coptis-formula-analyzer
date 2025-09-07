@@ -1,6 +1,3 @@
-using CoptisFormulaAnalyzer.Core.Interfaces;
-using Microsoft.Extensions.Logging;
-
 namespace CoptisFormulaAnalyzer.Application.Services;
 
 /// <summary>

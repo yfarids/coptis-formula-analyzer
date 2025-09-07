@@ -27,7 +27,7 @@ builder.Services.AddServerSideBlazor();
 
 // Add Entity Framework
 builder.Services.AddDbContext<FormulaAnalyzerContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("coptisDB")));
 
 // Add repositories
 builder.Services.AddScoped<IFormulaRepository, FormulaRepository>();
@@ -38,8 +38,8 @@ builder.Services.AddScoped<IFormulaService, FormulaService>();
 builder.Services.AddScoped<IRawMaterialService, RawMaterialService>();
 builder.Services.AddScoped<FileImportService>();
 
-// Add simple notification service as Singleton to ensure same instance across all scopes
-builder.Services.AddSingleton<CoptisFormulaAnalyzer.Core.Interfaces.INotificationService, CoptisFormulaAnalyzer.Application.Services.SimpleNotificationService>();
+// Add notification service as Singleton to ensure same instance across all scopes
+builder.Services.AddSingleton<INotificationService, NotificationService>();
 
 // Add file watcher as hosted service
 builder.Services.AddHostedService<FileWatcherService>();

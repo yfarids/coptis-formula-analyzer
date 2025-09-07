@@ -58,6 +58,83 @@ L'application suit les principes de l'**Architecture Propre** (Clean Architectur
 └─────────────────────────────────────────┘
 ```
 
+## Concepts et Patterns Utilisés
+
+### Concepts Architecturaux
+
+#### Clean Architecture (Architecture Propre)
+- **Séparation des responsabilités** : Chaque couche a une responsabilité spécifique et bien définie
+- **Inversion des dépendances** : Les couches externes dépendent des couches internes, jamais l'inverse
+- **Indépendance des frameworks** : La logique métier ne dépend pas des technologies externes
+- **Testabilité** : Architecture facilitant les tests unitaires et d'intégration
+
+#### Domain-Driven Design (DDD)
+- **Entités métier** : Modélisation des concepts du domaine cosmétique (Formula, RawMaterial, FormulaComponent)
+- **Services de domaine** : Logique métier complexe encapsulée dans des services spécialisés
+- **DTOs (Data Transfer Objects)** : Objets dédiés au transfert de données entre les couches
+- **Agrégats** : Groupement cohérent d'entités liées (Formula avec ses FormulaComponents)
+
+### Patterns de Conception
+
+#### Repository Pattern
+- **Abstraction de l'accès aux données** : Interface uniforme pour l'accès aux données
+- **Séparation des préoccupations** : Logique métier séparée de la persistance
+- **Facilitation des tests** : Possibilité de mocker les repositories pour les tests
+- **Centralisation des requêtes** : Toutes les requêtes base de données dans un endroit dédié
+
+#### Dependency Injection (Injection de Dépendances)
+- **Couplage faible** : Réduction des dépendances directes entre les classes
+- **Configuration centralisée** : Toutes les dépendances configurées dans Program.cs
+- **Facilitation des tests** : Injection de mocks et stubs pour les tests
+- **Gestion du cycle de vie** : Contrôle automatique de la durée de vie des objets
+
+#### Service Layer Pattern
+- **Encapsulation de la logique métier** : Services dédiés pour chaque domaine fonctionnel
+- **Coordination des opérations** : Orchestration des appels aux repositories
+- **Gestion des transactions** : Contrôle de la cohérence des données
+- **Interface uniforme** : API cohérente pour la couche présentation
+
+### Concepts de Développement
+
+#### SOLID Principles
+- **S - Single Responsibility** : Chaque classe a une seule raison de changer
+- **O - Open/Closed** : Classes ouvertes à l'extension, fermées à la modification
+- **L - Liskov Substitution** : Les objets dérivés peuvent remplacer leurs objets de base
+- **I - Interface Segregation** : Interfaces spécifiques plutôt qu'une interface générale
+- **D - Dependency Inversion** : Dépendre des abstractions, pas des implémentations concrètes
+
+#### Async/Await Pattern
+- **Programmation asynchrone** : Opérations non-bloquantes pour l'interface utilisateur
+- **Gestion des ressources** : Utilisation efficace des threads et de la mémoire
+- **Scalabilité** : Capacité à gérer de nombreuses requêtes simultanées
+- **Responsivité** : Interface utilisateur réactive pendant les opérations longues
+
+### Concepts Techniques Spécifiques
+
+#### File System Watcher
+- **Surveillance en temps réel** : Détection automatique des nouveaux fichiers JSON
+- **Traitement en arrière-plan** : Service hébergé (Hosted Service) pour la surveillance continue
+- **Gestion des événements** : Réaction aux événements de création/modification de fichiers
+- **Coordination des imports** : Synchronisation entre imports manuels et automatiques
+
+#### Real-time Communication (SignalR)
+- **Communication bidirectionnelle** : Serveur vers client en temps réel
+- **Notifications automatiques** : Mise à jour de l'interface lors d'imports automatiques
+- **Gestion de l'état** : Synchronisation de l'état entre plusieurs clients
+- **Hub Pattern** : Centralisation de la communication temps réel
+
+#### Error Handling & Resilience
+- **Gestion gracieuse des erreurs** : Aucun plantage système sur données invalides
+- **Validation en cascade** : Validation à tous les niveaux (DTO, Service, Repository)
+- **Logging structuré** : Journalisation avec Serilog pour le monitoring
+- **Messages utilisateur** : Retours d'erreurs compréhensibles pour l'utilisateur
+
+#### Business Rules Engine
+- **Calculs de coûts** : Algorithmes de calcul basés sur les poids et prix
+- **Règles de validation** : Validation des formules selon les règles métier
+- **Analyse des substances** : Agrégation et classement des données de substances
+- **Recalcul automatique** : Mise à jour en cascade lors de changements de prix
+
 ## Stack Technologique
 
 ### Technologies Backend
