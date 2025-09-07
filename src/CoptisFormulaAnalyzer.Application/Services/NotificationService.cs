@@ -1,3 +1,5 @@
+using CoptisFormulaAnalyzer.Core.Interfaces;
+
 namespace CoptisFormulaAnalyzer.Application.Services
 {
     public class NotificationService : INotificationService

@@ -8,7 +8,10 @@ Un outil d'analyse de formules cosmétiques complet développé avec .NET 8.0 et
 - **Importation JSON via Interface Web** : Importation manuelle de formules à travers une interface web intuitive
 - **Traitement Automatique de Fichiers** : Service de surveillance de fichiers qui traite automatiquement les fichiers JSON déposés dans un dossier surveillé
 - **Visualisation des Formules** : Vue d'ensemble complète de toutes les formules avec nom, poids total et coûts calculés
-- **Suppression de Formules** : Suppression sécurisée des formules du système
+- **Suppression de Formules** : Suppression sécurisée des formules avec confirmation utilisateur
+  - *Dialogue de confirmation JavaScript* : Utilise JSRuntime pour afficher une boîte de dialogue native du navigateur
+  - *Prévention des suppressions accidentelles* : L'utilisateur doit confirmer explicitement avant suppression
+  - *Seule fonctionnalité utilisant JSRuntime* : Toutes les autres fonctionnalités utilisent Blazor Server natif
 
 ### 2. Analyses Avancées
 - **Analyse des Substances par Poids** : Identifier les substances les plus utilisées selon le poids total dans toutes les formules
@@ -123,6 +126,12 @@ L'application suit les principes de l'**Architecture Propre** (Clean Architectur
 - **Gestion de l'état** : Synchronisation de l'état entre plusieurs clients
 - **Hub Pattern** : Centralisation de la communication temps réel
 
+#### Approche Blazor Server Pure
+- **Interactivité côté serveur** : Toutes les interactions utilisateur gérées via Blazor Server
+- **Minimal JavaScript** : Usage limité de JavaScript uniquement pour les dialogues de confirmation
+- **État géré côté serveur** : Gestion complète de l'état application côté serveur
+- **Binding bidirectionnel** : Liaison de données automatique entre UI et code C#
+
 #### Error Handling & Resilience
 - **Gestion gracieuse des erreurs** : Aucun plantage système sur données invalides
 - **Validation en cascade** : Validation à tous les niveaux (DTO, Service, Repository)
@@ -147,6 +156,7 @@ L'application suit les principes de l'**Architecture Propre** (Clean Architectur
 - **Blazor Server** : Rendu côté serveur avec mises à jour UI en temps réel
 - **Bootstrap 5** : Composants UI modernes et responsifs
 - **SignalR** : Communication temps réel pour l'actualisation automatique des données
+- **JavaScript Interop Minimal** : Usage limité de JSRuntime uniquement pour la confirmation de suppression
 
 ### Patterns Architecturaux
 - **Architecture Propre** : Séparation des préoccupations avec inversion des dépendances
@@ -250,6 +260,7 @@ Règles métier centralisées
 - **Architecture Maintenable** : Séparation claire des préoccupations pour des modifications faciles
 - **Conception Évolutive** : Pattern repository et injection de dépendances pour la croissance future
 - **Monitoring et Débogage** : Journalisation complète avec intégration Serilog
+- **Blazor Server Natif** : Développement entièrement en C# avec JavaScript minimal pour une maintenance simplifiée
 
 ## Améliorations Futures
 
