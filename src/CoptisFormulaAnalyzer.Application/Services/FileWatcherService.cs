@@ -12,6 +12,7 @@ public class FileWatcherService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly string _watchFolder;
     private FileSystemWatcher? _watcher;
+    private readonly SemaphoreSlim _processingLock = new(1, 1);
 
     public FileWatcherService(ILogger<FileWatcherService> logger, IServiceProvider serviceProvider, IConfiguration configuration)
     {
@@ -150,6 +151,8 @@ public class FileWatcherService : BackgroundService
 
     private async Task ProcessFile(string filePath)
     {
+        // Use semaphore to prevent concurrent file processing
+        await _processingLock.WaitAsync();
         try
         {
             _logger.LogInformation("Processing file: {FilePath}", filePath);
@@ -203,15 +206,44 @@ public class FileWatcherService : BackgroundService
                 _logger.LogWarning("File no longer exists: {FilePath}", filePath);
             }
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("File processing was cancelled for: {FilePath}", filePath);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing file: {FilePath}", filePath);
+        }
+        finally
+        {
+            _processingLock.Release();
         }
     }
 
     public override void Dispose()
     {
-        _watcher?.Dispose();
-        base.Dispose();
+        try
+        {
+            if (_watcher != null)
+            {
+                _watcher.EnableRaisingEvents = false;
+                _watcher.Created -= OnFileCreated;
+                _watcher.Changed -= OnFileChanged;
+                _watcher.Error -= OnWatcherError;
+                _watcher.Dispose();
+                _watcher = null;
+                _logger.LogDebug("FileSystemWatcher disposed successfully");
+            }
+            
+            _processingLock?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error disposing FileWatcherService");
+        }
+        finally
+        {
+            base.Dispose();
+        }
     }
 }

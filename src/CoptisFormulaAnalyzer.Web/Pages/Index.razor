@@ -272,6 +272,10 @@
 
     // Real-time update variables
     private DateTime? lastRefreshTime;
+    
+    // Prevent concurrent refresh operations
+    private bool isRefreshing = false;
+    private readonly SemaphoreSlim refreshSemaphore = new SemaphoreSlim(1, 1);
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,6 +287,10 @@
 
     private async void HandleDataChanged()
     {
+        // Skip if already refreshing or importing
+        if (isRefreshing || isImporting)
+            return;
+            
         await InvokeAsync(async () =>
         {
             await RefreshData();
@@ -343,8 +351,15 @@
 
     private async Task RefreshData()
     {
+        // Prevent concurrent refresh operations
+        if (!await refreshSemaphore.WaitAsync(100)) // Wait max 100ms
+        {
+            return; // Another refresh is already in progress, skip this one
+        }
+        
         try
         {
+            isRefreshing = true;
             var formulasData = await FormulaService.GetAllFormulasAsync();
             formulas = formulasData.Select(f => new FormulaDisplayDto
             {
@@ -365,6 +380,11 @@
         {
             importMessage = $"Error loading data: {ex.Message}";
             importSuccess = false;
+        }
+        finally
+        {
+            isRefreshing = false;
+            refreshSemaphore.Release();
         }
 
         StateHasChanged();
@@ -403,6 +423,9 @@
                 importMessage = "Formula imported successfully!";
                 importSuccess = true;
                 jsonInput = string.Empty;
+                
+                // RefreshData will be called automatically by the notification system
+                // But we can also call it here safely due to our semaphore protection
                 await RefreshData();
             }
             else
@@ -473,6 +496,9 @@
     {
         // Unsubscribe from notification events
         NotificationService.OnDataChanged -= HandleDataChanged;
+        
+        // Dispose semaphore
+        refreshSemaphore?.Dispose();
     }
 
     public class FormulaDisplayDto

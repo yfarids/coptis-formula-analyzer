@@ -13,14 +13,13 @@ Log.Logger = new LoggerConfiguration()
         .Build())
     .CreateLogger();
 
-try
-{
-    Log.Information("Starting CoptisFormulaAnalyzer Web Application");
 
-    var builder = WebApplication.CreateBuilder(args);
+Log.Information("Starting CoptisFormulaAnalyzer Web Application");
 
-    // Replace default logging with Serilog
-    builder.Host.UseSerilog();
+var builder = WebApplication.CreateBuilder(args);
+
+// Replace default logging with Serilog
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddRazorPages();
@@ -40,22 +39,22 @@ builder.Services.AddScoped<IRawMaterialService, RawMaterialService>();
 builder.Services.AddScoped<FileImportService>();
 
 // Add simple notification service (no SignalR needed for Blazor Server)
-builder.Services.AddSingleton<CoptisFormulaAnalyzer.Core.Interfaces.INotificationService, CoptisFormulaAnalyzer.Application.Services.SimpleNotificationService>();
+builder.Services.AddScoped<CoptisFormulaAnalyzer.Core.Interfaces.INotificationService, CoptisFormulaAnalyzer.Application.Services.SimpleNotificationService>();
 
 // Add file watcher as hosted service
 builder.Services.AddHostedService<FileWatcherService>();
 
-    var app = builder.Build();
+var app = builder.Build();
 
-    // Add Serilog request logging
-    app.UseSerilogRequestLogging();
+// Add Serilog request logging
+app.UseSerilogRequestLogging();
 
-    // Configure the HTTP request pipeline.
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseExceptionHandler("/Error");
-        app.UseHsts();
-    }
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -66,25 +65,11 @@ app.MapRazorPages();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
-// Start file watcher - commented out since FileImportService is now scoped
-// File watching functionality can be accessed through the UI
-// var fileImportService = app.Services.GetRequiredService<FileImportService>();
-// fileImportService.StartFileWatcher();
-
-    // Ensure database is created
-    using (var scope = app.Services.CreateScope())
-    {
-        var context = scope.ServiceProvider.GetRequiredService<FormulaAnalyzerContext>();
-        context.Database.EnsureCreated();
-    }
-
-    app.Run();
-}
-catch (Exception ex)
+// Ensure database is created
+using (var scope = app.Services.CreateScope())
 {
-    Log.Fatal(ex, "Application terminated unexpectedly");
+    var context = scope.ServiceProvider.GetRequiredService<FormulaAnalyzerContext>();
+    context.Database.EnsureCreated();
 }
-finally
-{
-    Log.CloseAndFlush();
-}
+
+app.Run();

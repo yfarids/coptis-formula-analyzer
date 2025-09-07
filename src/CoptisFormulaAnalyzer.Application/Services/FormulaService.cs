@@ -319,37 +319,80 @@ public class FormulaService : IFormulaService
 
     private async Task<RawMaterial> GetOrCreateRawMaterialAsync(RawMaterialDto rawMaterialDto)
     {
-        // First attempt to get existing raw material
-        var rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
-        if (rawMaterial != null)
-        {
-            return rawMaterial;
-        }
-
-        // Try to create new raw material
+        // Use a more robust approach to handle concurrency
         try
         {
+            // First attempt to get existing raw material
+            var rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
+            if (rawMaterial != null)
+            {
+                return rawMaterial;
+            }
+
+            // If it doesn't exist, try to create it
             rawMaterial = new RawMaterial
             {
                 Name = rawMaterialDto.Name,
                 PricePerKg = rawMaterialDto.Price.Amount,
                 CreatedDate = DateTime.UtcNow
             };
+            
             return await _rawMaterialRepository.AddAsync(rawMaterial);
         }
-        catch (Exception ex) when (ex.Message.Contains("duplicate key") || ex.Message.Contains("IX_RawMaterials_Name"))
+        catch (Exception ex) when (IsDuplicateKeyError(ex))
         {
-            // Another thread/process created this raw material, fetch the existing one
-            _logger.LogInformation("Raw material {RawMaterialName} was created by another process, fetching existing one", rawMaterialDto.Name);
+            // Another concurrent operation created this raw material
+            // Wait a bit and try to fetch it again
+            _logger.LogInformation("Raw material {RawMaterialName} was created by another process, retrying fetch", rawMaterialDto.Name);
             
-            rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
-            if (rawMaterial == null)
+            // Add a small delay to let the other operation complete
+            await Task.Delay(100);
+            
+            // Retry fetching the raw material with multiple attempts
+            for (int attempt = 1; attempt <= 3; attempt++)
             {
-                _logger.LogError("Failed to retrieve raw material {RawMaterialName} after duplicate key error", rawMaterialDto.Name);
-                throw new InvalidOperationException($"Could not create or retrieve raw material: {rawMaterialDto.Name}");
+                try
+                {
+                    var rawMaterial = await _rawMaterialRepository.GetByNameAsync(rawMaterialDto.Name);
+                    if (rawMaterial != null)
+                    {
+                        _logger.LogInformation("Successfully retrieved raw material {RawMaterialName} on attempt {Attempt}", rawMaterialDto.Name, attempt);
+                        return rawMaterial;
+                    }
+                    
+                    if (attempt < 3)
+                    {
+                        await Task.Delay(50 * attempt); // Exponential backoff
+                    }
+                }
+                catch (Exception retryEx)
+                {
+                    _logger.LogWarning(retryEx, "Attempt {Attempt} to fetch raw material {RawMaterialName} failed", attempt, rawMaterialDto.Name);
+                    if (attempt < 3)
+                    {
+                        await Task.Delay(100 * attempt);
+                    }
+                }
             }
             
-            return rawMaterial;
+            _logger.LogError("Failed to retrieve raw material {RawMaterialName} after duplicate key error and retries", rawMaterialDto.Name);
+            throw new InvalidOperationException($"Could not create or retrieve raw material: {rawMaterialDto.Name}");
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error creating/retrieving raw material {RawMaterialName}", rawMaterialDto.Name);
+            throw;
+        }
+    }
+
+    private static bool IsDuplicateKeyError(Exception ex)
+    {
+        var message = ex.ToString();
+        return message.Contains("duplicate key") || 
+               message.Contains("IX_RawMaterials_Name") ||
+               message.Contains("unique constraint") ||
+               message.Contains("UNIQUE constraint") ||
+               message.Contains("Cannot insert duplicate key row") ||
+               (ex.InnerException != null && IsDuplicateKeyError(ex.InnerException));
     }
 }
