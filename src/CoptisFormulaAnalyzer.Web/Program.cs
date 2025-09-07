@@ -38,8 +38,8 @@ builder.Services.AddScoped<IFormulaService, FormulaService>();
 builder.Services.AddScoped<IRawMaterialService, RawMaterialService>();
 builder.Services.AddScoped<FileImportService>();
 
-// Add simple notification service (no SignalR needed for Blazor Server)
-builder.Services.AddScoped<CoptisFormulaAnalyzer.Core.Interfaces.INotificationService, CoptisFormulaAnalyzer.Application.Services.SimpleNotificationService>();
+// Add simple notification service as Singleton to ensure same instance across all scopes
+builder.Services.AddSingleton<CoptisFormulaAnalyzer.Core.Interfaces.INotificationService, CoptisFormulaAnalyzer.Application.Services.SimpleNotificationService>();
 
 // Add file watcher as hosted service
 builder.Services.AddHostedService<FileWatcherService>();
